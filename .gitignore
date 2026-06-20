@@ -2,5 +2,9 @@
 # 内含从 ~/.claude 对话提取的私人内容，绝不入库。
 skill-log/
 
+# Python 字节码缓存
+__pycache__/
+*.pyc
+
 # macOS / editor 杂物
 .DS_Store
