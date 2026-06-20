@@ -1,10 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
-  launchd 任务模板。安装时必须把下面两处绝对路径改成本机实际安装位置：
-    1. ProgramArguments 第二项 → <安装目录>/run_skill_insight.sh
-    2. StandardOutPath / StandardErrorPath → <安装目录>/skill-log/skill_insight.log
-  改完复制到 ~/Library/LaunchAgents/ 再 `launchctl load`。详见 README.md。
+  launchd job template. Before installing, replace the TWO absolute paths below
+  with your real install location, then copy to ~/Library/LaunchAgents/ and load.
+  See README for details.
+
+  安装前把下面两处绝对路径改成你的实际安装位置，再复制到 ~/Library/LaunchAgents/ 并加载。详见 README。
+    1. ProgramArguments[1]  -> <INSTALL_DIR>/run_skill_insight.sh
+    2. StandardOutPath / StandardErrorPath -> <INSTALL_DIR>/skill-log/skill_insight.log
 -->
 <plist version="1.0">
 <dict>
@@ -13,7 +16,7 @@
 	<key>ProgramArguments</key>
 	<array>
 		<string>/bin/zsh</string>
-		<string>/Users/henry/dev/2_skills/skill-insight/run_skill_insight.sh</string>
+		<string>/ABSOLUTE/PATH/TO/skill-insight/run_skill_insight.sh</string>
 	</array>
 	<key>StartCalendarInterval</key>
 	<dict>
@@ -31,8 +34,8 @@
 	<key>LowPriorityBackgroundIO</key>
 	<true/>
 	<key>StandardOutPath</key>
-	<string>/Users/henry/dev/2_skills/skill-insight/skill-log/skill_insight.log</string>
+	<string>/ABSOLUTE/PATH/TO/skill-insight/skill-log/skill_insight.log</string>
 	<key>StandardErrorPath</key>
-	<string>/Users/henry/dev/2_skills/skill-insight/skill-log/skill_insight.log</string>
+	<string>/ABSOLUTE/PATH/TO/skill-insight/skill-log/skill_insight.log</string>
 </dict>
 </plist>

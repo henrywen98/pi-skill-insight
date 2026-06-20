@@ -20,7 +20,7 @@ LOCK="${OUT_DIR}/.skill_insight.lock"
 now=$(date +%s)
 
 # desktop notification helper — fired only on real outcomes (report done / failed)
-# so Henry knows the launchd job actually ran. Skips/backoff stay silent.
+# so you know the launchd job actually ran. Skips/backoff stay silent.
 notify() {
   # terminal-notifier posts a real banner — osascript/Script Editor banners are
   # suppressed on this machine. Args pass through directly (CJK/quotes safe);
@@ -77,7 +77,7 @@ fi
 GAP_DAYS=""
 [[ -f "$MARKER" ]] && GAP_DAYS=$(( (now - $(cat "$MARKER")) / 86400 ))
 
-export PATH="/Users/henry/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
 
 # pre-extract the heavy data so pi reads one compact JSON instead of GBs of jsonl
 EXTRACT="${OUT_DIR}/.cache/skill_extract.json"
@@ -91,9 +91,9 @@ if ! nice -n 19 python3 "${BASE_DIR}/extract_skill_data.py" \
 fi
 
 PROMPT=$(cat <<EOF
-你是一个每两周定时运行的「Skill 使用洞察」评测任务。方法论参考 skill-creator 的评测循环：把每次真实的 skill 调用当作一个测试用例——逐例评分（grader）、量化汇总（benchmark）、与基线和上一期对比（iteration）、分析师找隐藏模式（analyzer）、最后产出可验证的改进建议。与 skill-creator 的区别：它用人造测试用例做主动实验，你用 Henry 过去 ${WINDOW} 天的真实对话记录做被动评测——所有证据来自用户的实际行为，不许臆测。
+你是一个每两周定时运行的「Skill 使用洞察」评测任务。方法论参考 skill-creator 的评测循环：把每次真实的 skill 调用当作一个测试用例——逐例评分（grader）、量化汇总（benchmark）、与基线和上一期对比（iteration）、分析师找隐藏模式（analyzer）、最后产出可验证的改进建议。与 skill-creator 的区别：它用人造测试用例做主动实验，你用用户过去 ${WINDOW} 天的真实对话记录做被动评测——所有证据来自用户的实际行为，不许臆测。
 
-背景：Henry 的习惯是，某个 skill 效果不好时，他会在调用之后连续发多条消息手动纠正和指引。这些「调用后的人工指引」每一条都是 skill 没写到位的证据，是本评测最核心的信号源。
+背景：用户的习惯是，某个 skill 效果不好时，他会在调用之后连续发多条消息手动纠正和指引。这些「调用后的人工指引」每一条都是 skill 没写到位的证据，是本评测最核心的信号源。
 
 数据源——主数据已经预提取好了，优先用它，省时省资源：
 - ${EXTRACT} —— 预提取 JSON（本次运行刚生成）。结构：
@@ -104,13 +104,13 @@ PROMPT=$(cat <<EOF
 - 原始 transcript（calls[].file 指向的 jsonl）—— 仅在评分拿不准、需要更完整上下文时才打开个别文件精读；不要重新全量扫描
 - ~/.claude/skills/<name>/SKILL.md —— 需要给具体修改文案时读对应 skill 的现状
 - ${OUT_DIR}/ —— 历期报告（skill_usage_report_*.md），用于第 5 步迭代对比
-- ~/.claude/history.jsonl 与 /Users/henry/.claude/skills/claude-memory/scripts/search.py —— 仅第 3 步（找未触发 skill 的同类任务会话做基线）和第 6 步（扫漏触发场景）需要查非 skill 会话时用，按关键词定向检索，不要全量扫描
+- ~/.claude/history.jsonl 与 ~/.claude/skills/claude-memory/scripts/search.py（若安装了 claude-memory skill）—— 仅第 3 步（找未触发 skill 的同类任务会话做基线）和第 6 步（扫漏触发场景）需要查非 skill 会话时用，按关键词定向检索，不要全量扫描
 
 评测流程：
 
 【第 1 步 · 圈定用例】直接读 ${EXTRACT} 的 per_skill_summary 和 explicit_slash_counts 得到全部统计，不要自己扫 jsonl。
 
-【第 2 步 · 逐例评分（grader）】优先覆盖 Henry 的自定义 skill（installed.user_skills 里的，无插件命名空间），其次插件 skill。对 calls[] 里的每次调用，依据 after_user_msgs 和 same_file_repeats，按固定评分表打分：
+【第 2 步 · 逐例评分（grader）】优先覆盖用户的自定义 skill（installed.user_skills 里的，无插件命名空间），其次插件 skill。对 calls[] 里的每次调用，依据 after_user_msgs 和 same_file_repeats，按固定评分表打分：
   - A 成功：无人工干预，或仅确认性回复（"好/可以/继续"）
   - B 轻度干预：1-2 条纠正（"不对/改成…"）或补充约束（"注意要…/不要…"）
   - C 重度干预：>=3 条纠正，或用户手把手拆步骤（"你先…然后…再…"），或同一会话内重调同一 skill（重试信号）
