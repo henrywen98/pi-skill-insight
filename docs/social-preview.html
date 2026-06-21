@@ -1,0 +1,83 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1280px; height: 640px; overflow: hidden; }
+  body {
+    font-family: -apple-system, "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
+    background:
+      radial-gradient(1100px 600px at 82% -10%, rgba(124,92,255,.28), transparent 60%),
+      radial-gradient(900px 600px at 0% 110%, rgba(52,211,153,.16), transparent 55%),
+      linear-gradient(135deg, #16122b 0%, #0b0a14 100%);
+    color: #f5f4ff;
+    padding: 72px 80px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  .kicker {
+    font: 600 22px/1 ui-monospace, "SF Mono", Menlo, monospace;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: #9d8cff;
+    display: flex; align-items: center; gap: 14px;
+  }
+  .kicker .dot { width: 11px; height: 11px; border-radius: 50%; background: #34d399; box-shadow: 0 0 16px #34d399; }
+  h1 {
+    font: 800 104px/1 ui-monospace, "SF Mono", Menlo, monospace;
+    letter-spacing: -2px;
+    margin-top: 26px;
+  }
+  h1 .pi { color: #b6a6ff; }
+  .tagline { font-size: 38px; font-weight: 700; margin-top: 22px; line-height: 1.2; }
+  .sub { font-size: 25px; color: #b9b6d6; margin-top: 16px; line-height: 1.4; max-width: 1000px; }
+  .pipe { display: flex; align-items: center; gap: 16px; margin-top: 6px; }
+  .pill {
+    display: flex; align-items: center; gap: 11px;
+    background: rgba(255,255,255,.055);
+    border: 1px solid rgba(255,255,255,.14);
+    border-radius: 14px;
+    padding: 15px 20px;
+    font: 600 24px/1 ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  .pill .em { font-size: 26px; }
+  .pill.agent { border-color: rgba(124,92,255,.7); background: rgba(124,92,255,.18); color: #d9d0ff; }
+  .arrow { color: #6f6a93; font-size: 30px; }
+  .footer {
+    display: flex; justify-content: space-between; align-items: center;
+    font: 500 23px/1 ui-monospace, "SF Mono", Menlo, monospace;
+    color: #8d89ad;
+  }
+  .footer .repo { color: #cfcbe9; }
+  .badges { display: flex; gap: 22px; }
+</style>
+</head>
+<body>
+  <div>
+    <div class="kicker"><span class="dot"></span> CASE STUDY · pi&nbsp;-p automation</div>
+    <h1><span class="pi">pi</span>-skill-insight</h1>
+  </div>
+
+  <div>
+    <div class="tagline">A headless AI agent wired into a self-healing cron job.</div>
+    <div class="sub">Every two weeks it grades how you use your own Claude&nbsp;Code skills — which help, which misfire, and exactly how to fix them.</div>
+  </div>
+
+  <div class="pipe">
+    <div class="pill"><span class="em">⏰</span> launchd</div>
+    <span class="arrow">→</span>
+    <div class="pill agent"><span class="em">🤖</span> pi -p</div>
+    <span class="arrow">→</span>
+    <div class="pill"><span class="em">📄</span> report</div>
+    <span class="arrow">→</span>
+    <div class="pill"><span class="em">🔔</span> notify</div>
+  </div>
+
+  <div class="footer">
+    <span class="repo">github.com/henrywen98/pi-skill-insight</span>
+    <span class="badges"><span>macOS</span><span>·</span><span>MIT</span><span>·</span><span>zsh + python</span></span>
+  </div>
+</body>
+</html>
