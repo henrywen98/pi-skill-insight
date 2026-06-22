@@ -151,3 +151,22 @@ def test_build_intent_groups_reserve_keeps_ndc_group():
     # budget large enough for a few entries but not all 51
     groups, selected, omitted = build_intent_groups(sessions, token_budget=400)
     assert any(g["no_distinctive_cmd"] for g in groups), "NDC reserve must protect the doc group"
+
+
+from extract_skill_data import build_no_skill_index
+
+
+def test_build_no_skill_index_shape():
+    sessions = [
+        {"first_user_msg": "make a gif", "cmd_sig": ["ffmpeg"], "project": "p1", "file": "f1"},
+        {"first_user_msg": "make a gif too", "cmd_sig": ["ffmpeg"], "project": "p2", "file": "f2"},
+    ]
+    idx = build_no_skill_index(sessions)
+    assert idx["scanned"] == 2
+    assert idx["omitted"] == 0
+    assert "ffmpeg" in idx["cmd_census"]
+    assert idx["cmd_census"]["ffmpeg"]["projects"] == 2
+    assert isinstance(idx["intent_groups"], list)
+    assert idx["estimated_tokens"] == estimate_tokens({
+        "scanned": idx["scanned"], "selected": idx["selected"], "omitted": idx["omitted"],
+        "cmd_census": idx["cmd_census"], "intent_groups": idx["intent_groups"]})

@@ -279,6 +279,20 @@ def build_intent_groups(sessions, token_budget=INDEX_TOKEN_BUDGET,
     return out, selected, total - selected
 
 
+def build_no_skill_index(sessions, token_budget=INDEX_TOKEN_BUDGET):
+    census = build_cmd_census(sessions)
+    groups, selected, omitted = build_intent_groups(sessions, token_budget)
+    idx = {
+        "scanned": len(sessions),
+        "selected": selected,
+        "omitted": omitted,
+        "cmd_census": census,
+        "intent_groups": groups,
+    }
+    idx["estimated_tokens"] = estimate_tokens(idx)
+    return idx
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--window", type=int, default=14)
