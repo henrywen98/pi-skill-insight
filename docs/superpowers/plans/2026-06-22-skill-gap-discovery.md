@@ -426,8 +426,7 @@ def test_build_intent_groups_groups_and_counts():
         _sess("Write a PRD for X", [], file="b"),
         _sess("rebase my branch", ["git rebase"], file="c"),
     ]
-    groups, selected, omitted = build_intent_groups(sessions, token_budget=INDEX_TOKEN_BUDGET)
-    by_msg = {g["representative_msg"].lower()[:11]: g for g in groups}
+    groups, selected, omitted = build_intent_groups(sessions, token_budget=100_000)
     prd = next(g for g in groups if "prd" in g["representative_msg"].lower())
     assert prd["similar_sessions"] == 2
     assert prd["no_distinctive_cmd"] is True
