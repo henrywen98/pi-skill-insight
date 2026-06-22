@@ -93,6 +93,25 @@ def candidate_files(window_days):
     return len(files), hits
 
 
+TOOL_MARK_RE = r'"name":"(Bash|Write|Edit)"'
+
+
+def tool_candidate_files(window_days):
+    """jsonl files in window containing at least one Bash/Write/Edit call."""
+    res = subprocess.run(
+        ["find", str(CLAUDE / "projects"), "-name", "*.jsonl",
+         "-mtime", f"-{window_days}"],
+        capture_output=True, text=True)
+    files = [f for f in res.stdout.splitlines() if f]
+    hits = []
+    for i in range(0, len(files), 200):
+        batch = files[i:i + 200]
+        g = subprocess.run(["grep", "-lE", TOOL_MARK_RE] + batch,
+                           capture_output=True, text=True)
+        hits.extend(g.stdout.splitlines())
+    return hits
+
+
 def parse_file(path):
     """One pass over a transcript: ordered user messages + Skill calls."""
     events = []  # ('user'|'call', payload) in file order
@@ -281,7 +300,9 @@ def build_intent_groups(sessions, token_budget=INDEX_TOKEN_BUDGET,
 
 def build_no_skill_index(sessions, token_budget=INDEX_TOKEN_BUDGET):
     census = build_cmd_census(sessions)
-    groups, selected, omitted = build_intent_groups(sessions, token_budget)
+    census_tok = estimate_tokens(census)
+    groups, selected, omitted = build_intent_groups(
+        sessions, max(0, token_budget - census_tok))
     idx = {
         "scanned": len(sessions),
         "selected": selected,
@@ -383,6 +404,24 @@ def main():
                for k, v in sorted(per_skill.items(),
                                   key=lambda kv: -kv[1]["calls"])}
 
+    # missing-skill discovery: tool-using sessions -> bounded navigation index
+    no_skill_sessions = []
+    for path in tool_candidate_files(args.window):
+        payload = parse_session_index(path)
+        if payload is None:
+            continue
+        rel = os.path.relpath(path, CLAUDE / "projects")
+        payload["file"] = path
+        payload["project"] = rel.split(os.sep)[0]
+        no_skill_sessions.append(payload)
+    no_skill_index = build_no_skill_index(no_skill_sessions, INDEX_TOKEN_BUDGET)
+    if no_skill_index["omitted"]:
+        print(f"no_skill_index: scanned {no_skill_index['scanned']}, "
+              f"selected {no_skill_index['selected']}, "
+              f"omitted {no_skill_index['omitted']} "
+              f"(~{no_skill_index['estimated_tokens']} tok, "
+              f"budget {INDEX_TOKEN_BUDGET})", file=sys.stderr)
+
     out = {
         "window_days": args.window,
         "scanned_files": total_files,
@@ -391,6 +430,7 @@ def main():
         "per_skill_summary": summary,
         "explicit_slash_counts": dict(slash.most_common()),
         "installed": installed,
+        "no_skill_index": no_skill_index,
         "calls": calls,
     }
     out_path = Path(args.out)
