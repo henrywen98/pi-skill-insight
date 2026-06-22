@@ -2,6 +2,9 @@
 # 内含从 ~/.claude 对话提取的私人内容，绝不入库。
 skill-log/
 
+# Claude Code 本地工作区与草稿（worktree 里含 skill-log/ 私密数据），绝不入库。
+.claude/
+
 # Python 字节码缓存
 __pycache__/
 *.pyc

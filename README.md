@@ -131,7 +131,7 @@ leaves your machine. The only sample in this repo is the **synthetic** one under
 | File | Purpose |
 | --- | --- |
 | `run_skill_insight.sh` | The harness: gate, window, lock, backoff, notify — wraps one `pi -p` call |
-| `extract_skill_data.py` | Pre-extracts `~/.claude` skill calls into one compact JSON for the agent |
+| `extract_skill_data.py` | Pre-extracts `~/.claude` into one compact JSON: graded skill calls **and** a `no_skill_index` (bounded navigation index of tool-using sessions) for missing-skill discovery |
 | `com.henry.skill-insight.plist` | launchd job template (edit the two paths before installing) |
 | `examples/sample_report.md` | Synthetic illustrative output |
 | `skill-log/` | Real output + state (gitignored, local only) |
