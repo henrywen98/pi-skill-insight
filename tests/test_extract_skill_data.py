@@ -1,5 +1,5 @@
 import json
-from extract_skill_data import cmd_head, parse_session_index
+from extract_skill_data import cmd_head, parse_session_index, estimate_tokens, build_cmd_census
 
 
 def _write_jsonl(path, rows):
@@ -85,3 +85,25 @@ def test_parse_session_index_skips_noise_and_dedups(tmp_path):
     assert r["first_user_msg"] == "real first ask"
     assert r["n_turns"] == 1
     assert r["cmd_sig"] == ["ffmpeg"]
+
+
+def test_estimate_tokens_grows_with_size():
+    assert estimate_tokens({}) < estimate_tokens({"k": "x" * 400})
+
+
+def test_build_cmd_census_counts_and_dedups():
+    sessions = [
+        {"cmd_sig": ["ffmpeg", "ffmpeg"], "project": "p1", "file": "f1"},
+        {"cmd_sig": ["ffmpeg"], "project": "p2", "file": "f2"},
+        {"cmd_sig": ["git rebase"], "project": "p1", "file": "f3"},
+    ]
+    census = build_cmd_census(sessions)
+    assert census["ffmpeg"]["sessions"] == 2
+    assert census["ffmpeg"]["projects"] == 2
+    assert set(census["ffmpeg"]["examples"]) == {"f1", "f2"}
+    assert list(census)[0] == "ffmpeg"  # sorted by sessions desc
+
+
+def test_build_cmd_census_caps_examples():
+    sessions = [{"cmd_sig": ["x"], "project": "p", "file": f"f{i}"} for i in range(10)]
+    assert len(build_cmd_census(sessions, examples_cap=5)["x"]["examples"]) == 5

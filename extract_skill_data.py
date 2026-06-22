@@ -188,6 +188,24 @@ def parse_session_index(path):
     }
 
 
+def estimate_tokens(obj):
+    return len(json.dumps(obj, ensure_ascii=False)) // 4
+
+
+def build_cmd_census(sessions, examples_cap=EXAMPLES_CAP):
+    agg = defaultdict(lambda: {"sessions": 0, "projects": set(), "examples": []})
+    for s in sessions:
+        for h in dict.fromkeys(s["cmd_sig"]):  # distinct heads, order-preserving
+            a = agg[h]
+            a["sessions"] += 1
+            a["projects"].add(s["project"])
+            if len(a["examples"]) < examples_cap:
+                a["examples"].append(s["file"])
+    return {h: {"sessions": a["sessions"], "projects": len(a["projects"]),
+                "examples": a["examples"]}
+            for h, a in sorted(agg.items(), key=lambda kv: -kv[1]["sessions"])}
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--window", type=int, default=14)
