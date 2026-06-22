@@ -206,6 +206,79 @@ def build_cmd_census(sessions, examples_cap=EXAMPLES_CAP):
             for h, a in sorted(agg.items(), key=lambda kv: -kv[1]["sessions"])}
 
 
+INTENT_STOP = set(
+    "the a an to of for and or in on at is be do my me i you your please can "
+    "help with this that it now then so just give make want need".split())
+
+
+def intent_key(msg):
+    toks = re.findall(r"[a-z0-9]+|[一-鿿]+", msg.lower())
+    toks = [t for t in toks if t not in INTENT_STOP][:8]
+    return " ".join(sorted(set(toks)))
+
+
+def _group_entry(g, examples_cap):
+    return {
+        "representative_msg": g["msg"][:FIRST_MSG_LIMIT],
+        "similar_sessions": g["sessions"],
+        "projects": len(g["projects"]),
+        "examples": g["examples"][:examples_cap],
+        "no_distinctive_cmd": g["no_distinctive_cmd"],
+    }
+
+
+def build_intent_groups(sessions, token_budget=INDEX_TOKEN_BUDGET,
+                        examples_cap=EXAMPLES_CAP):
+    groups = {}
+    for s in sessions:
+        k = intent_key(s["first_user_msg"])
+        g = groups.get(k)
+        if g is None:
+            g = groups[k] = {"msg": s["first_user_msg"], "sessions": 0,
+                             "projects": set(), "examples": [],
+                             "no_distinctive_cmd": True}
+        g["sessions"] += 1
+        g["projects"].add(s["project"])
+        if len(g["examples"]) < examples_cap:
+            g["examples"].append(s["file"])
+        if s["cmd_sig"]:
+            g["no_distinctive_cmd"] = False
+
+    total = sum(g["sessions"] for g in groups.values())
+    ordered = sorted(groups.values(), key=lambda g: -g["sessions"])
+    reserve = token_budget * NDC_RESERVE_FRAC
+
+    out, used = [], set()
+
+    def try_add(g, ceiling):
+        entry = _group_entry(g, examples_cap)
+        if estimate_tokens(out + [entry]) > ceiling:
+            return False
+        out.append(entry)
+        used.add(id(g))
+        return True
+
+    # Phase 1: by recurrence up to (budget - reserve)
+    for g in ordered:
+        if not try_add(g, token_budget - reserve):
+            break
+    # Phase 2: spend the reserve preferentially on not-yet-included NDC groups
+    for g in ordered:
+        if id(g) in used:
+            continue
+        if g["no_distinctive_cmd"]:
+            try_add(g, token_budget)
+    # Phase 3: backfill any remaining budget by recurrence
+    for g in ordered:
+        if id(g) in used:
+            continue
+        if not try_add(g, token_budget):
+            break
+
+    selected = sum(e["similar_sessions"] for e in out)
+    return out, selected, total - selected
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--window", type=int, default=14)

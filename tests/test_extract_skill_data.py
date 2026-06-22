@@ -107,3 +107,47 @@ def test_build_cmd_census_counts_and_dedups():
 def test_build_cmd_census_caps_examples():
     sessions = [{"cmd_sig": ["x"], "project": "p", "file": f"f{i}"} for i in range(10)]
     assert len(build_cmd_census(sessions, examples_cap=5)["x"]["examples"]) == 5
+
+
+from extract_skill_data import intent_key, build_intent_groups
+
+
+def test_intent_key_dedups_near_identical():
+    assert intent_key("Write a PRD for billing") == intent_key("write a prd for billing please")
+    assert intent_key("Write a PRD for billing") != intent_key("summarize this meeting doc")
+
+
+def _sess(msg, cmd_sig, project="p", file="f"):
+    return {"first_user_msg": msg, "cmd_sig": cmd_sig, "project": project, "file": file}
+
+
+def test_build_intent_groups_groups_and_counts():
+    sessions = [
+        _sess("write a prd for X", [], file="a"),
+        _sess("Write a PRD for X", [], file="b"),
+        _sess("rebase my branch", ["git rebase"], file="c"),
+    ]
+    groups, selected, omitted = build_intent_groups(sessions, token_budget=100_000)
+    prd = next(g for g in groups if "prd" in g["representative_msg"].lower())
+    assert prd["similar_sessions"] == 2
+    assert prd["no_distinctive_cmd"] is True
+    rb = next(g for g in groups if "rebase" in g["representative_msg"].lower())
+    assert rb["no_distinctive_cmd"] is False
+    assert selected == 3 and omitted == 0
+
+
+def test_build_intent_groups_budget_clips_and_reports_omitted():
+    sessions = [_sess(f"distinct ask number {i}", ["cmd%d" % i], file=f"f{i}")
+                for i in range(200)]
+    groups, selected, omitted = build_intent_groups(sessions, token_budget=200)
+    assert selected + omitted == 200
+    assert omitted > 0  # tiny budget must clip
+
+
+def test_build_intent_groups_reserve_keeps_ndc_group():
+    # 50 single-session command groups (big by order) + 1 NDC group of size 1.
+    sessions = [_sess(f"cmd task {i}", [f"c{i}"], file=f"c{i}") for i in range(50)]
+    sessions.append(_sess("please write documentation", [], file="ndc"))
+    # budget large enough for a few entries but not all 51
+    groups, selected, omitted = build_intent_groups(sessions, token_budget=400)
+    assert any(g["no_distinctive_cmd"] for g in groups), "NDC reserve must protect the doc group"
