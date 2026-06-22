@@ -1,4 +1,18 @@
-from extract_skill_data import cmd_head
+import json
+from extract_skill_data import cmd_head, parse_session_index
+
+
+def _write_jsonl(path, rows):
+    path.write_text("\n".join(json.dumps(r) for r in rows), encoding="utf-8")
+
+
+def _assistant_tool(name, **inp):
+    return {"type": "assistant",
+            "message": {"content": [{"type": "tool_use", "name": name, "input": inp}]}}
+
+
+def _user(text):
+    return {"type": "user", "message": {"content": text}}
 
 
 def test_cmd_head_plain():
@@ -22,3 +36,52 @@ def test_cmd_head_pipeline_takes_first():
 def test_cmd_head_empty():
     assert cmd_head("") == ""
     assert cmd_head("   ") == ""
+
+
+def test_parse_session_index_basic(tmp_path):
+    f = tmp_path / "s.jsonl"
+    _write_jsonl(f, [
+        _user("convert all my videos to gifs please"),
+        _assistant_tool("Bash", command="ffmpeg -i a.mp4 a.gif"),
+        _assistant_tool("Write", file_path="/tmp/convert.sh"),
+        _user("now do the second one"),
+        _assistant_tool("Bash", command="git rebase main"),
+    ])
+    r = parse_session_index(str(f))
+    assert r["has_skill"] is False
+    assert r["first_user_msg"] == "convert all my videos to gifs please"
+    assert r["n_turns"] == 2
+    assert r["cmd_sig"] == ["ffmpeg", "git rebase"]
+    assert r["wrote"] == ["sh"]
+
+
+def test_parse_session_index_flags_skill(tmp_path):
+    f = tmp_path / "mixed.jsonl"
+    _write_jsonl(f, [
+        _user("do the thing"),
+        _assistant_tool("Skill", skill="some-skill"),
+        _assistant_tool("Bash", command="ffmpeg -i a.mp4 a.gif"),
+    ])
+    r = parse_session_index(str(f))
+    assert r["has_skill"] is True
+    assert r["cmd_sig"] == ["ffmpeg"]
+
+
+def test_parse_session_index_none_without_tools(tmp_path):
+    f = tmp_path / "chat.jsonl"
+    _write_jsonl(f, [_user("what is the capital of France?")])
+    assert parse_session_index(str(f)) is None
+
+
+def test_parse_session_index_skips_noise_and_dedups(tmp_path):
+    f = tmp_path / "n.jsonl"
+    _write_jsonl(f, [
+        _user("<system-reminder>ignore me</system-reminder>"),
+        _user("real first ask"),
+        _assistant_tool("Bash", command="ffmpeg -i a b"),
+        _assistant_tool("Bash", command="ffmpeg -i c d"),
+    ])
+    r = parse_session_index(str(f))
+    assert r["first_user_msg"] == "real first ask"
+    assert r["n_turns"] == 1
+    assert r["cmd_sig"] == ["ffmpeg"]

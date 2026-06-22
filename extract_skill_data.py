@@ -128,6 +128,66 @@ def parse_file(path):
     return events
 
 
+def parse_session_index(path):
+    """One pass over a transcript -> thin missing-skill index payload.
+
+    Returns None if the session has no Bash/Write/Edit tool use (not a
+    manual-workflow candidate). Caller adds file/project.
+    """
+    first_user_msg = ""
+    n_turns = 0
+    has_skill = False
+    has_tool = False
+    cmd_sig = []
+    wrote = set()
+    with open(path, errors="replace") as f:
+        for line in f:
+            is_user = '"type":' in line and '"user"' in line
+            is_asst = '"type":' in line and '"assistant"' in line
+            if not (is_user or is_asst):
+                continue
+            try:
+                obj = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            msg = obj.get("message") or {}
+            if obj.get("type") == "user":
+                text = msg_text(msg)
+                if is_noise(text):
+                    continue
+                n_turns += 1
+                if not first_user_msg:
+                    first_user_msg = text[:FIRST_MSG_LIMIT]
+            elif obj.get("type") == "assistant":
+                for item in (msg.get("content") or []):
+                    if not (isinstance(item, dict) and item.get("type") == "tool_use"):
+                        continue
+                    name = item.get("name")
+                    inp = item.get("input") or {}
+                    if name == "Skill":
+                        has_skill = True
+                    elif name == "Bash":
+                        has_tool = True
+                        h = cmd_head(inp.get("command", ""))
+                        if h and h not in cmd_sig and len(cmd_sig) < CMD_SIG_CAP:
+                            cmd_sig.append(h)
+                    elif name in ("Write", "Edit"):
+                        has_tool = True
+                        fp = inp.get("file_path") or inp.get("filePath") or ""
+                        base = os.path.basename(fp)
+                        if "." in base:
+                            wrote.add(base.rsplit(".", 1)[-1])
+    if not has_tool:
+        return None
+    return {
+        "has_skill": has_skill,
+        "first_user_msg": first_user_msg,
+        "n_turns": n_turns,
+        "cmd_sig": cmd_sig,
+        "wrote": sorted(wrote),
+    }
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--window", type=int, default=14)
