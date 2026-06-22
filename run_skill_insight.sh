@@ -101,6 +101,7 @@ PROMPT=$(cat <<EOF
   * calls[]：每次调用一条，含 skill、ts、project、in_subagent、trigger_cmd（非空=用户显式 /命令触发）、prompt_before（触发前最后一条用户发言）、after_user_msgs[]（调用后最多 6 条真实用户发言，系统噪音已滤掉，text 截断到 800 字）、same_file_repeats（同会话内该 skill 被调次数）、file（原始 transcript 路径）
   * explicit_slash_counts：窗口期内用户手动输入的 /命令 统计
   * installed：已安装的 user_skills 和 plugin_skills 清单
+  * no_skill_index：缺失-skill 发现的导航索引（不是结论）。scanned/selected/omitted/estimated_tokens 为覆盖元信息；cmd_census={命令头:{sessions 跨会话数, projects 跨项目数, examples 代表会话路径}}（永不封顶）；intent_groups=[{representative_msg 代表诉求, similar_sessions 近似会话数, projects 跨项目数, examples 代表会话路径, no_distinctive_cmd 是否只有 Write/Edit 无特征命令}]（按 token 预算去重后保留）
 - 原始 transcript（calls[].file 指向的 jsonl）—— 仅在评分拿不准、需要更完整上下文时才打开个别文件精读；不要重新全量扫描
 - ~/.claude/skills/<name>/SKILL.md —— 需要给具体修改文案时读对应 skill 的现状
 - ${OUT_DIR}/ —— 历期报告（skill_usage_report_*.md），用于第 5 步迭代对比
@@ -130,7 +131,14 @@ PROMPT=$(cat <<EOF
   - 执行类（改 SKILL.md 正文）：依据第 2/4 步。同一 skill 跨会话 >=2 次的同类指引才算缺陷模式；给出可直接粘贴的具体文案，从模式归纳「通用原则 + 解释 why」，不要把单次个例写成 ALWAYS/NEVER 死规则（过拟合）；模型有 theory of mind，讲清楚为什么比堆大写命令更有效。
   - 触发类（改 description）：对照已安装清单列出近 ${WINDOW} 天零调用的 skill；粗扫用户 prompt 找「本该触发却没触发」的漏触发场景。建议遵循 pushy description 原则：Claude 天然倾向 under-trigger，description 要「做什么」+「什么时候用」+ 枚举具体触发语境（用户常说的词、文件类型、场景），宁可偏推销也不要含蓄。
 
-【第 7 步 · trigger 评测集】把漏触发用户原话（should_trigger: true）和误触发场景原话（should_trigger: false）按 skill 整理成 JSON 数组附录：[{"query": "<用户原话>", "should_trigger": true/false}, ...]。原话不要改写润色（最多截短）。这份评测集后续会喂给 skill-creator 的 description 自动优化循环。
+【第 7 步 · 能力缺口（建议新建 skill）】读 no_skill_index——这是索引不是结论。
+  - 用 cmd_census（看 sessions/projects）和 intent_groups（看 similar_sessions/projects）找出跨 >=2 会话反复出现的工作流苗头；跨 >=2 项目才更可能是全局 skill，单项目反复优先考虑写进该项目的 CLAUDE.md。
+  - 最小取证（防 under-explore）：每个进入报告的候选簇，必须实际打开 examples 里 >=2 个会话读全以坐实工作流，并引用真实用户原话；只凭索引、不开会话，不得下结论。
+  - 大文件护栏：读 examples 前先 wc -c / ls -la 看大小，偏大的用 grep/head 定点看，不要整文件读入。
+  - 对每个簇做路由判断：该新建 skill / 该进 CLAUDE.md（全局或项目级偏好）/ 该扩展现有 skill（那归第 6 步触发类）——只有真·无人覆盖的反复工作流进本节；逐个与 installed 去重，已存在的不提。
+  - 若 no_skill_index.omitted > 0（有实质截断），在本节开头一句声明覆盖范围（scanned/selected/omitted）。
+
+【第 8 步 · trigger 评测集】把漏触发用户原话（should_trigger: true）和误触发场景原话（should_trigger: false）按 skill 整理成 JSON 数组附录：[{"query": "<用户原话>", "should_trigger": true/false}, ...]。原话不要改写润色（最多截短）。这份评测集后续会喂给 skill-creator 的 description 自动优化循环。
 
 输出要求：把完整报告写入 ${REPORT_FILE}（中文 Markdown），结构为：
 ① 本期记分卡（skill / 调用次数 / A-D 分布 / 干预率 / 失败率 / 项目数 / 触发方式）
@@ -138,8 +146,9 @@ PROMPT=$(cat <<EOF
 ③ 基线对照与分析师发现（系统性问题 / 高方差 / 重复劳动）
 ④ 上期建议追踪（已采纳·见效 / 已采纳·未见效 / 未采纳，逐条）
 ⑤ 本期优化建议汇总（执行类 vs 触发类，按优先级，附依据）
-⑥ 附录：按 skill 分组的 trigger 评测集 JSON
-篇幅向 ② 和 ④ 倾斜。
+⑥ 建议新建的 Skill（能力缺口）：每个候选给出——候选名+一句话职责；命中证据（出现 N 次·跨 M 项目·2-3 条用户原话截短不润色·典型命令/脚本签名）；一句路由判断（为什么是 skill 而非 CLAUDE.md/扩展现有）；description 草稿（pushy 原则：做什么+何时用+枚举触发语境）；SKILL.md 主体要点+可能的 scripts/ 草图；置信度（高/中）。节首若 omitted>0 先声明覆盖范围。
+⑦ 附录：按 skill 分组的 trigger 评测集 JSON
+篇幅向 ②、④、⑥ 倾斜。
 
 注意：transcripts 是 GB 级数据，全部用 find/grep/wc 等管道做统计，不要整文件读入大 jsonl。
 EOF
