@@ -22,6 +22,14 @@ CMD_RE = re.compile(r"<command-name>([^<]+)</command-name>")
 PROMPT_BEFORE_LIMIT = 600
 AFTER_TEXT_LIMIT = 800
 AFTER_MSG_CAP = 6
+FIRST_MSG_LIMIT = 240
+CMD_SIG_CAP = 15
+EXAMPLES_CAP = 5
+INDEX_TOKEN_BUDGET = 60000
+NDC_RESERVE_FRAC = 0.25
+GENERIC_HEADS = {"git", "docker", "npm", "npx", "pnpm", "yarn", "pip", "pip3",
+                 "cargo", "kubectl", "go", "make", "brew", "apt", "systemctl"}
+ENV_ASSIGN_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 
 
 def msg_text(message):
@@ -43,6 +51,30 @@ def is_noise(text):
             or t.startswith("Caveat:")
             or t.startswith("Base directory for this skill")
             or t.startswith("Launching skill"))
+
+
+def cmd_head(command):
+    """Normalized head of a bash command for frequency aggregation.
+
+    First meaningful token; for a GENERIC_HEADS head, append its first
+    non-flag subcommand (git -> 'git rebase'). Strips env-assignments, sudo,
+    path prefixes, and ignores all but the first command in a pipeline/seq.
+    """
+    if not command or not command.strip():
+        return ""
+    seg = re.split(r"[|&;]", command.strip(), maxsplit=1)[0]
+    toks = seg.split()
+    i = 0
+    while i < len(toks) and (ENV_ASSIGN_RE.match(toks[i]) or toks[i] == "sudo"):
+        i += 1
+    if i >= len(toks):
+        return ""
+    head = os.path.basename(toks[i])
+    if head in GENERIC_HEADS:
+        for sub in toks[i + 1:]:
+            if not sub.startswith("-"):
+                return f"{head} {sub}"
+    return head
 
 
 def candidate_files(window_days):
